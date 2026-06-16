@@ -1,59 +1,82 @@
 @import "tailwindcss";
 
-:root {
-  /* Brand */
-  --brand-primary: #ffdb0f;
-  --brand-secondary: #161407;
-  --brand-tertiary: #ff6a29;
-  --brand-cream: #fffdeb;
-  --brand-mint: #c3d9cc;
-  --brand-sand: #aea485;
-  --brand-white: #ffffff;
+/* PP Radio Grotesk — police du design (fichiers locaux dans /public/Font). */
+@font-face {
+  font-family: "PP Radio Grotesk";
+  src: url("/Font/PPRadioGrotesk-Ultralight.otf") format("opentype");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PP Radio Grotesk";
+  src: url("/Font/PPRadioGrotesk-UltralightItalic.otf") format("opentype");
+  font-weight: 200;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PP Radio Grotesk";
+  src: url("/Font/PPRadioGrotesk-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PP Radio Grotesk";
+  src: url("/Font/PPRadioGrotesk-RegularItalic.otf") format("opentype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PP Radio Grotesk";
+  src: url("/Font/PPRadioGrotesk-Black.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PP Radio Grotesk";
+  src: url("/Font/PPRadioGrotesk-BlackItalic.otf") format("opentype");
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
 
-  --background: var(--brand-cream);
-  --foreground: var(--brand-secondary);
+:root {
+  /* Palette Bitstack (design Figma) */
+  --ink: #161407; /* texte / éléments sombres */
+  --yellow: #ffdb0f;
+  --sand: #aea485;
+  --mint: #c3d9cc;
+  --cream: #ece9d8; /* fond de page parchemin */
+  --panel: #e6e3d2; /* carte légèrement teintée */
+  --track: #dfddd0; /* rail du slider */
+
+  --background: var(--cream);
+  --foreground: var(--ink);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --font-sans: "PP Radio Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-}
-
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--brand-mint);
-  outline: none;
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--brand-secondary);
-  cursor: pointer;
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--brand-secondary);
-  cursor: pointer;
-  border: none;
+  font-family: "PP Radio Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translate(-50%, 8px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
