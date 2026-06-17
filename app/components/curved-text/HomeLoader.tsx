@@ -6,61 +6,61 @@ import gsap from "gsap";
 /**
  * Loader d'entrée affiché par-dessus l'éditeur au chargement de la home.
  *
- * Séquence (GSAP) : le titre se révèle mot à mot, une barre de progression se
- * remplit, puis le voile crème se relève vers le haut pour découvrir l'éditeur.
- * On utilise `gsap.context()` + `ctx.revert()` (pattern recommandé sans
- * @gsap/react) pour un nettoyage propre au démontage.
+ * Un gros compteur 0 → 100 % (police Black) ancré en bas à droite, animé
+ * proprement via un proxy GSAP, puis le voile crème se relève pour découvrir
+ * l'éditeur. On utilise `gsap.context()` + `ctx.revert()` (pattern recommandé
+ * sans @gsap/react) pour un nettoyage propre au démontage.
  */
 export default function HomeLoader() {
   const rootRef = useRef<HTMLDivElement>(null);
+  const numberRef = useRef<HTMLSpanElement>(null);
   // `done` démonte le voile une fois l'animation terminée.
   const [done, setDone] = useState(false);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
+      // Proxy animé : GSAP fait varier `value`, on écrit l'entier dans le DOM.
+      const counter = { value: 0 };
+
       const tl = gsap.timeline({
         defaults: { ease: "power3.out" },
         onComplete: () => setDone(true),
       });
 
       tl
-        // Titre : chaque mot monte depuis le bas (masqué par overflow-hidden).
-        .from(".loader-word", {
-          yPercent: 120,
-          duration: 0.7,
-          stagger: 0.08,
-          ease: "power4.out",
-        })
-        // Barre de progression : remplissage gauche -> droite.
-        .fromTo(
-          ".loader-bar-fill",
-          { scaleX: 0 },
-          { scaleX: 1, duration: 1, ease: "power2.inOut" },
-          "-=0.3",
-        )
-        // Le pourcentage compte de 0 à 100 en parallèle de la barre.
-        .to(
-          ".loader-percent",
-          {
-            duration: 1,
-            ease: "power2.inOut",
-            // Compteur entier via snap sur un proxy texte.
-            innerText: 100,
-            snap: { innerText: 1 },
-          },
-          "<",
-        )
-        // Petite pause, puis le voile se relève.
-        .to(".loader-content", {
+        // Apparition du compteur (monte légèrement + fondu).
+        .from(".loader-count", {
+          yPercent: 40,
           autoAlpha: 0,
-          duration: 0.4,
+          duration: 0.6,
+          ease: "power3.out",
+        })
+        // Comptage 0 -> 100, propre et fluide.
+        .to(
+          counter,
+          {
+            value: 100,
+            duration: 2.2,
+            ease: "power2.inOut",
+            onUpdate: () => {
+              if (numberRef.current) {
+                numberRef.current.textContent = String(Math.round(counter.value));
+              }
+            },
+          },
+          "-=0.2",
+        )
+        // Le compteur s'efface, puis le voile se relève.
+        .to(".loader-count", {
+          autoAlpha: 0,
+          duration: 0.35,
           ease: "power2.in",
         })
-        .to(rootRef.current, {
-          yPercent: -100,
-          duration: 0.9,
-          ease: "power4.inOut",
-        });
+        .to(
+          rootRef.current,
+          { opacity: 0, duration: 0.9, ease: "power4.inOut" },
+          "-=0.1",
+        );
     }, rootRef);
 
     return () => ctx.revert();
@@ -71,26 +71,14 @@ export default function HomeLoader() {
   return (
     <div
       ref={rootRef}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-(--cream) text-[var(--ink)]"
+      className="fixed inset-0 z-100 flex items-end justify-end bg-(--cream) p-6 text-(--ink) sm:p-10"
     >
-      <div className="loader-content flex w-[min(440px,80vw)] flex-col items-center gap-8">
-        {/* Titre, révélé mot à mot. */}
-        <h1 className="flex flex-wrap justify-center gap-x-[0.28em] overflow-hidden text-[34px] font-medium leading-[1] tracking-[-0.01em]">
-          <span className="loader-word inline-block">Bitstack</span>
-          <span className="loader-word inline-block">type</span>
-          <span className="loader-word inline-block">tool</span>
-        </h1>
-
-        {/* Barre de progression + pourcentage. */}
-        <div className="flex w-full flex-col gap-2">
-          <div className="h-[3px] w-full overflow-hidden rounded-full bg-[#161407]/12">
-            <div className="loader-bar-fill h-full w-full origin-left rounded-full bg-[var(--ink)]" />
-          </div>
-          <div className="flex justify-end text-[13px] tabular-nums tracking-[-0.01em] text-[#161407]/55">
-            <span className="loader-percent">0</span>
-            <span>%</span>
-          </div>
-        </div>
+      {/* Compteur 0 -> 100 %, police Black, ancré en bas à droite. */}
+      <div className="loader-count flex items-end font-black leading-[0.8] tracking-[-0.02em]">
+        <span ref={numberRef} className="text-[17vw] tabular-nums">
+          0
+        </span>
+        <span className="mb-[1.2vw] ml-[0.5vw] text-[6vw] sm:text-[5vw]">%</span>
       </div>
     </div>
   );

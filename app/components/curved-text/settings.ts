@@ -44,10 +44,10 @@ export const DEFAULT_SETTINGS: TextSettings = {
   italic: false,
   // Réglages d'après la boîte « Options de déformation » d'Illustrator :
   // Arc horizontal, Inflexion 30 %, Distorsion H 0 %, Distorsion V 5 %.
-  curveAmount: 30,
+  curveAmount: 40,
   distortH: 0,
   distortV: 5,
-  letterSpacing: 0,
+  letterSpacing: -1,
   offsetX: 0,
   offsetY: 0,
   textShadow: false,

@@ -86,7 +86,15 @@ function measureWidth(ctx: CanvasRenderingContext2D, s: TextSettings): number {
   return Math.max(0, w - gap);
 }
 
-export function drawCurvedText(ctx: CanvasRenderingContext2D, s: TextSettings) {
+/**
+ * @param reveal Progression d'apparition par lettre (0 = invisible, 1 = en place).
+ *   Peut dépasser 1 (rebond de l'ease). Si omis, tout est affiché à 100 %.
+ */
+export function drawCurvedText(
+  ctx: CanvasRenderingContext2D,
+  s: TextSettings,
+  reveal?: number[],
+) {
   ctx.clearRect(0, 0, s.width, s.height);
 
   if (!s.bgTransparent) {
@@ -141,16 +149,24 @@ export function drawCurvedText(ctx: CanvasRenderingContext2D, s: TextSettings) {
     const [, yBot] = env(u, 0.5);
     const scaleV = (yBot - yTop) / H;
 
+    // Apparition par lettre (GSAP) : scale + fondu. Sans `reveal`, p = 1.
+    const p = reveal ? reveal[i] ?? 1 : 1;
+    if (p <= 0) return; // lettre pas encore apparue
+    const alpha = Math.min(1, Math.max(0, p));
+
     ctx.setTransform(base);
     ctx.translate(gx, gy);
     // Cisaillement vertical (b = slope) : penche la ligne de base, fûts verticaux.
     ctx.transform(1, slope, 0, scaleV, 0, 0);
+    if (p !== 1) ctx.scale(p, p); // pop : grossit de 0 -> 1 (peut dépasser via l'ease)
+    ctx.globalAlpha = alpha;
     if (s.strokeEnabled) {
       ctx.strokeStyle = s.strokeColor;
       ctx.lineWidth = s.strokeWidth;
       ctx.strokeText(ch, 0, 0);
     }
     ctx.fillText(ch, 0, 0);
+    ctx.globalAlpha = 1;
   });
 
   ctx.setTransform(base);
