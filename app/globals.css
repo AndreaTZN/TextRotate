@@ -1,46 +1,32 @@
 @import "tailwindcss";
 
-/* PP Radio Grotesk — police du design (fichiers locaux dans /public/Font). */
+/* Centra No.1 — police du design (fichiers locaux dans /public/Font). */
 @font-face {
-  font-family: "PP Radio Grotesk";
-  src: url("/Font/PPRadioGrotesk-Ultralight.otf") format("opentype");
-  font-weight: 200;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "PP Radio Grotesk";
-  src: url("/Font/PPRadioGrotesk-UltralightItalic.otf") format("opentype");
-  font-weight: 200;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "PP Radio Grotesk";
-  src: url("/Font/PPRadioGrotesk-Regular.otf") format("opentype");
+  font-family: "Centra No1";
+  src: url("/Font/CentraNo.1-Book-Trial.otf") format("opentype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "PP Radio Grotesk";
-  src: url("/Font/PPRadioGrotesk-RegularItalic.otf") format("opentype");
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "PP Radio Grotesk";
-  src: url("/Font/PPRadioGrotesk-Black.otf") format("opentype");
-  font-weight: 900;
+  font-family: "Centra No1";
+  src: url("/Font/CentraNo.1-Medium-Trial.otf") format("opentype");
+  font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "PP Radio Grotesk";
-  src: url("/Font/PPRadioGrotesk-BlackItalic.otf") format("opentype");
+  font-family: "Centra No1";
+  src: url("/Font/CentraNo.1-Bold-Trial.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Centra No1";
+  src: url("/Font/CentraNo.1-Black-Trial.otf") format("opentype");
   font-weight: 900;
-  font-style: italic;
+  font-style: normal;
   font-display: swap;
 }
 
@@ -61,13 +47,13 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "PP Radio Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Centra No1", ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "PP Radio Grotesk", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Centra No1", ui-sans-serif, system-ui, sans-serif;
 }
 
 @keyframes fadeIn {
@@ -79,4 +65,57 @@ body {
     opacity: 1;
     transform: translate(-50%, 0);
   }
+}
+
+/* Slider « Deformation » (cf. design Figma) : rail crème arrondi + poignée
+   blanche. On stylise l'input range natif (accessible + clavier).
+   ⚠️ Chaque pseudo-élément vendor est déclaré dans sa PROPRE règle : groupés,
+   Lightning CSS (Tailwind v4) jette tout le bloc s'il n'en reconnaît pas un. */
+@layer components {
+  .range-deformation {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 0.9375rem;
+    border-radius: 100vw;
+    background: var(--track); /* #dfddd0 */
+    box-shadow: inset 0 0 1px 0 rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+    outline: none;
+  }
+  .range-deformation:focus-visible {
+    box-shadow:
+      inset 0 0 1px 0 rgba(0, 0, 0, 0.12),
+      0 0 0 2px rgba(22, 20, 7, 0.35);
+  }
+}
+
+.range-deformation::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 1.25rem;
+  height: 0.75rem;
+  border-radius: 100vw;
+  background: #fff;
+  box-shadow: 0 4px 4px -4px rgba(0, 0, 0, 0.42);
+  transition: transform 0.1s ease;
+}
+.range-deformation:active::-webkit-slider-thumb {
+  transform: scale(1.08);
+}
+.range-deformation::-moz-range-thumb {
+  width: 1.25rem;
+  height: 0.75rem;
+  border: none;
+  border-radius: 100vw;
+  background: #fff;
+  box-shadow: 0 4px 4px -4px rgba(0, 0, 0, 0.42);
+}
+/* Graduations sous un slider (+ 10 / + 40 / + 80). */
+.slider-tick {
+  font-size: 0.75rem; /* 12px */
+  font-weight: 500;
+  line-height: 0.85;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: rgba(22, 20, 7, 0.52);
 }
