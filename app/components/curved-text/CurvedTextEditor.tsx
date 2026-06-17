@@ -2,36 +2,74 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import gsap from "gsap";
-import { DEFAULT_SETTINGS, loadCanvasFont, type TextSettings } from "./settings";
+import {
+  DEFAULT_SETTINGS,
+  loadCanvasFont,
+  makeLayerId,
+  type TextLayer,
+  type TextSettings,
+} from "./settings";
 import { drawCurvedText, measureTextBox } from "./render";
 import { buildSvg } from "./svg";
 import type { Font } from "opentype.js";
 
 // Police vectorisée (pour l'export SVG), chargée à la demande via opentype.js.
-const CANVAS_FONT_URL = "/Font/PPRadioGrotesk-Black.otf";
+const CANVAS_FONT_URL = "/Font/CentraNo.1-Black-Trial.otf";
 
 // Le canvas affiché utilise un backing store 2x pour rester net sur écran retina.
 const RENDER_SCALE = 2;
 
+// Slider « Deformation » : la position va de 10 à 60 (défaut 30), et curveAmount
+// est interpolé linéairement entre 25 et 35 sur cette plage
+// (10 → 25, 30 → 30, 60 → 35).
+const DEFORMATION_MIN = 10;
+const DEFORMATION_MAX = 60;
+const CURVE_MIN = 25;
+const CURVE_MAX = 35;
+
+// position du slider (10..60) → curveAmount (25..35)
+function sliderToCurve(pos: number): number {
+  const t = (pos - DEFORMATION_MIN) / (DEFORMATION_MAX - DEFORMATION_MIN);
+  return CURVE_MIN + t * (CURVE_MAX - CURVE_MIN);
+}
+
+// curveAmount (25..35) → position du slider (10..60)
+function curveToSlider(curve: number): number {
+  const t = (curve - CURVE_MIN) / (CURVE_MAX - CURVE_MIN);
+  return DEFORMATION_MIN + t * (DEFORMATION_MAX - DEFORMATION_MIN);
+}
+
 export default function CurvedTextEditor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mainRef = useRef<HTMLElement>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   // Police vectorisée, chargée et mise en cache au premier export SVG.
   const svgFont = useRef<Font | null>(null);
   // Progression d'apparition par lettre (0 -> 1), animée par GSAP.
   const reveal = useRef<number[]>([]);
-  const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const [settings, setSettings] = useState<TextSettings>(DEFAULT_SETTINGS);
+  // Calque de texte actuellement sélectionné (édité par le panneau, déplaçable).
+  const [activeId, setActiveId] = useState<string>(
+    DEFAULT_SETTINGS.texts[0].id,
+  );
   const [fontTick, setFontTick] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const [hovering, setHovering] = useState(false);
   const [dragging, setDragging] = useState(false);
   // État du glisser-déplacer du texte : null quand on ne déplace pas.
-  const drag = useRef<
-    | { pointerId: number; startX: number; startY: number; baseX: number; baseY: number }
-    | null
-  >(null);
+  const drag = useRef<{
+    pointerId: number;
+    layerId: string;
+    startX: number;
+    startY: number;
+    baseX: number;
+    baseY: number;
+  } | null>(null);
 
   // Redessine quand les webfonts arrivent.
   useEffect(() => {
@@ -57,7 +95,9 @@ export default function CurvedTextEditor() {
       const w = Math.max(1, Math.round(el.clientWidth));
       const h = Math.max(1, Math.round(el.clientHeight));
       setSettings((prev) =>
-        prev.width === w && prev.height === h ? prev : { ...prev, width: w, height: h },
+        prev.width === w && prev.height === h
+          ? prev
+          : { ...prev, width: w, height: h },
       );
     };
     apply();
@@ -70,8 +110,8 @@ export default function CurvedTextEditor() {
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     ctx.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0);
-    drawCurvedText(ctx, settings, reveal.current);
-  }, [settings]);
+    drawCurvedText(ctx, settings, reveal.current, activeId);
+  }, [settings, activeId]);
 
   useEffect(() => {
     draw();
@@ -84,7 +124,8 @@ export default function CurvedTextEditor() {
   const revealCtx = useRef<gsap.Context | null>(null);
   const playReveal = useCallback(() => {
     revealCtx.current?.revert();
-    const n = settings.text.length;
+    const active = settings.texts.find((t) => t.id === activeId);
+    const n = active ? [...active.text].length : 0;
     if (n === 0) {
       reveal.current = [];
       draw();
@@ -116,12 +157,12 @@ export default function CurvedTextEditor() {
         },
       );
     });
-  }, [settings.text, draw]);
+  }, [settings.texts, activeId, draw]);
 
   // Joue l'apparition au montage (police prête) puis, après chaque modification du
   // texte, à la fin de la frappe (debounce ~400 ms) pour ne pas rejouer à chaque
   // caractère.
-/*   useEffect(() => {
+  useEffect(() => {
     if (fontTick === 0) return; // attend le 1er chargement de police
     clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(playReveal, 400);
@@ -129,21 +170,57 @@ export default function CurvedTextEditor() {
       clearTimeout(typingTimer.current);
       revealCtx.current?.revert();
     };
-  }, [fontTick, playReveal]); */
+  }, [fontTick, playReveal]); 
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   const update = (patch: Partial<TextSettings>) =>
     setSettings((prev) => ({ ...prev, ...patch }));
 
+  // Applique un patch au calque actif uniquement (contenu, position…).
+  const updateActiveLayer = (patch: Partial<TextLayer>) =>
+    setSettings((prev) => ({
+      ...prev,
+      texts: prev.texts.map((t) =>
+        t.id === activeId ? { ...t, ...patch } : t,
+      ),
+    }));
+
+  // Ajoute un nouveau calque au centre (légèrement décalé) et le sélectionne.
+  const addLayer = () => {
+    const layer: TextLayer = {
+      id: makeLayerId(),
+      text: "TEXTE",
+      offsetX: 0,
+      offsetY: 0,
+    };
+    setSettings((prev) => ({ ...prev, texts: [...prev.texts, layer] }));
+    setActiveId(layer.id);
+  };
+
+  // Supprime un calque (on garde toujours au moins un calque).
+  const removeLayer = (id: string) =>
+    setSettings((prev) => {
+      if (prev.texts.length <= 1) return prev;
+      const texts = prev.texts.filter((t) => t.id !== id);
+      if (id === activeId) setActiveId(texts[0].id);
+      return { ...prev, texts };
+    });
+
   // Réinitialise tous les réglages par défaut (texte, position…) en conservant les
   // dimensions courantes du canvas (qui suivent la taille de la zone de travail).
-  const reset = () =>
+  const reset = () => {
     setSettings((prev) => ({
       ...DEFAULT_SETTINGS,
       width: prev.width,
       height: prev.height,
     }));
+    setActiveId(DEFAULT_SETTINGS.texts[0].id);
+  };
+
+  // Calque actuellement sélectionné (toujours présent : au moins un calque).
+  const activeLayer =
+    settings.texts.find((t) => t.id === activeId) ?? settings.texts[0];
 
   // Convertit un événement pointeur en coordonnées canvas (non scalées).
   const toCanvasPoint = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -154,24 +231,34 @@ export default function CurvedTextEditor() {
     };
   };
 
-  // Vrai si le point (canvas) tombe sur la boîte englobante du texte.
-  const hitsText = (x: number, y: number) => {
+  // Renvoie le calque dont la boîte englobante contient le point (canvas), en
+  // testant du dessus vers le dessous (les derniers calques sont dessinés au-dessus).
+  const layerAt = (x: number, y: number): TextLayer | null => {
     const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return false;
-    const box = measureTextBox(ctx, settings);
-    return x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h;
+    if (!ctx) return null;
+    for (let i = settings.texts.length - 1; i >= 0; i--) {
+      const layer = settings.texts[i];
+      const box = measureTextBox(ctx, settings, layer);
+      if (x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h) {
+        return layer;
+      }
+    }
+    return null;
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const p = toCanvasPoint(e);
-    if (!hitsText(p.x, p.y)) return;
+    const layer = layerAt(p.x, p.y);
+    if (!layer) return;
+    setActiveId(layer.id); // sélectionne le calque cliqué
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = {
       pointerId: e.pointerId,
+      layerId: layer.id,
       startX: p.x,
       startY: p.y,
-      baseX: settings.offsetX,
-      baseY: settings.offsetY,
+      baseX: layer.offsetX,
+      baseY: layer.offsetY,
     };
     setDragging(true);
   };
@@ -180,13 +267,21 @@ export default function CurvedTextEditor() {
     const p = toCanvasPoint(e);
     const d = drag.current;
     if (!d) {
-      setHovering(hitsText(p.x, p.y));
+      setHovering(layerAt(p.x, p.y) !== null);
       return;
     }
-    update({
-      offsetX: Math.round(d.baseX + (p.x - d.startX)),
-      offsetY: Math.round(d.baseY + (p.y - d.startY)),
-    });
+    setSettings((prev) => ({
+      ...prev,
+      texts: prev.texts.map((t) =>
+        t.id === d.layerId
+          ? {
+              ...t,
+              offsetX: Math.round(d.baseX + (p.x - d.startX)),
+              offsetY: Math.round(d.baseY + (p.y - d.startY)),
+            }
+          : t,
+      ),
+    }));
   };
 
   const endDrag = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -218,7 +313,11 @@ export default function CurvedTextEditor() {
       });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.download = `${settings.text.toLowerCase() || "texte"}.svg`;
+      const name = settings.texts
+        .map((t) => t.text)
+        .join("-")
+        .toLowerCase();
+      link.download = `${name || "texte"}.svg`;
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
@@ -264,7 +363,10 @@ export default function CurvedTextEditor() {
                 />
                 <defs>
                   <clipPath id="bitstack-a">
-                    <path fill="#fff" d="M184.789 5.462h444.952v94.174H184.789z" />
+                    <path
+                      fill="#fff"
+                      d="M184.789 5.462h444.952v94.174H184.789z"
+                    />
                   </clipPath>
                   <clipPath id="bitstack-b">
                     <path fill="#fff" d="M0 3.531h162.425v98.241H0z" />
@@ -273,20 +375,110 @@ export default function CurvedTextEditor() {
               </svg>
             </h1>
 
-            {/* Text */}
+            {/* Text : liste des calques (sélection + suppression), ajout, et
+               champ d'édition du calque actif. */}
             <section className="flex flex-col gap-4">
-              <h2 className="text-[16px] font-medium leading-[0.85] tracking-[-0.01em]">
-                Text
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-[16px] font-medium leading-[0.85] tracking-[-0.01em]">
+                  Text
+                </h2>
+                <button
+                  type="button"
+                  onClick={addLayer}
+                  aria-label="Ajouter un texte"
+                  className="flex size-6 items-center justify-center rounded-full border border-[#161407]/20 text-(--ink) transition hover:border-[#161407]/40 hover:bg-[#161407]/4"
+                >
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M6 1v10M1 6h10"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Liste des calques : clic = sélectionne, croix = supprime. */}
+              {settings.texts.length > 1 && (
+                <ul className="flex flex-col gap-1.5">
+                  {settings.texts.map((layer) => {
+                    const isActive = layer.id === activeId;
+                    return (
+                      <li key={layer.id} className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setActiveId(layer.id)}
+                          className={`flex-1 truncate rounded-lg px-3 py-1.5 text-left text-[13px] uppercase leading-[1.2] tracking-[-0.01em] transition ${
+                            isActive
+                              ? "bg-[#161407]/10 text-(--ink) ring-1 ring-[#161407]/30"
+                              : "text-[#161407]/60 hover:bg-[#161407]/4"
+                          }`}
+                        >
+                          {layer.text || "(vide)"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeLayer(layer.id)}
+                          aria-label="Supprimer ce texte"
+                          className="flex size-6 shrink-0 items-center justify-center rounded-full text-[14px] leading-none text-[#161407]/40 transition hover:bg-[#161407]/8 hover:text-(--ink)"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
               <input
                 type="text"
-                value={settings.text}
-                onChange={(e) => update({ text: e.target.value.toUpperCase() })}
+                value={activeLayer.text}
+                onChange={(e) =>
+                  updateActiveLayer({ text: e.target.value.toUpperCase() })
+                }
                 placeholder="VOTRE TEXTE…"
                 spellCheck={false}
-                aria-label="Texte"
+                aria-label="Texte du calque sélectionné"
                 className="w-full rounded-lg bg-white/60 px-3 py-2.25 text-[14px] uppercase leading-[1.2] tracking-[-0.01em] text-(--ink) outline-none ring-1 ring-[#161407]/12 transition placeholder:text-[#161407]/36 focus:bg-white focus:ring-[1.5px] focus:ring-[#161407]/50"
               />
+            </section>
+
+            {/* Deformation : pilote l'inflexion (Bend) de l'Arc — cf. design Figma.
+               Le slider va de 10 à 60 (défaut 30) ; curveAmount est interpolé
+               linéairement entre 25 et 35 (10 → 25, 30 → 30, 60 → 35). */}
+            <section className="flex flex-col gap-3.5">
+              <h2 className="text-base font-medium leading-[0.85] tracking-[-0.01em]">
+                Deformation
+              </h2>
+              <div className="flex flex-col gap-2 w-full">
+                <input
+                  type="range"
+                  min={DEFORMATION_MIN}
+                  max={DEFORMATION_MAX}
+                  step={1}
+                  value={curveToSlider(settings.curveAmount)}
+                  onChange={(e) =>
+                    update({
+                      curveAmount: sliderToCurve(Number(e.target.value)),
+                    })
+                  }
+                  aria-label="Déformation"
+                  className="range-deformation w-full"
+                />
+                <div className="flex w-full justify-between">
+                  <span className="slider-tick">+ 10</span>
+                  <span className="slider-tick text-center">+ 30</span>
+                  <span className="slider-tick text-right">+ 60</span>
+                </div>
+              </div>
             </section>
           </div>
 

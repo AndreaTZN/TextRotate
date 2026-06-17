@@ -1,6 +1,10 @@
 import type { Font, PathCommand } from "opentype.js";
 import { makeEnvelope } from "./render";
-import { CANVAS_FONT_WEIGHT, type TextSettings } from "./settings";
+import {
+  CANVAS_FONT_WEIGHT,
+  type TextLayer,
+  type TextSettings,
+} from "./settings";
 
 /**
  * Export SVG **vectorisé** : on récupère les contours des glyphes via opentype.js
@@ -36,11 +40,33 @@ interface GlyphData {
 const f = (n: number) => n.toFixed(2);
 
 /**
- * Construit le SVG vectorisé. `font` est la police PP Radio Grotesk Black chargée
+ * Construit le SVG vectorisé. `font` est la police Centra No.1 Black chargée
  * via opentype.js (cf. CurvedTextEditor).
  */
 export function buildSvg(s: TextSettings, font: Font): string {
-  const text = s.text;
+  // Un sous-chemin `d` par calque (même enveloppe que le canvas), combinés ensuite.
+  const d = s.texts.map((layer) => buildLayerPath(s, layer, font)).join("");
+
+  const bg = s.bgTransparent
+    ? ""
+    : `<rect width="${s.width}" height="${s.height}" fill="${s.bgColor}"/>`;
+
+  const strokeAttrs = s.strokeEnabled
+    ? ` stroke="${s.strokeColor}" stroke-width="${s.strokeWidth}" paint-order="stroke"`
+    : "";
+
+  const label = s.texts.map((t) => t.text).join(" · ");
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${s.width}" height="${s.height}" viewBox="0 0 ${s.width} ${s.height}">
+  ${bg}
+  <path d="${d.trim()}" fill="${s.color}" fill-rule="nonzero"${strokeAttrs}/>
+  <!-- ${escapeXml(`${label} · weight ${CANVAS_FONT_WEIGHT}`)} -->
+</svg>`;
+}
+
+/** Construit le sous-chemin `d` vectorisé d'un calque (warp d'enveloppe). */
+function buildLayerPath(s: TextSettings, layer: TextLayer, font: Font): string {
+  const text = layer.text;
   const fontSize = s.fontSize;
   const gap = tracking(s);
   const unit = fontSize / font.unitsPerEm;
@@ -74,8 +100,8 @@ export function buildSvg(s: TextSettings, font: Font): string {
 
   // 2) Warp d'enveloppe vertical (même géométrie que le canvas) appliqué à CHAQUE
   //    point (ancres ET points de contrôle Bézier) — les courbes restent lisses.
-  const cx = s.width / 2 + s.offsetX;
-  const cy = s.height / 2 + s.offsetY;
+  const cx = s.width / 2 + layer.offsetX;
+  const cy = s.height / 2 + layer.offsetY;
   const env = makeEnvelope(s, textWidth, boxH, cx, cy);
 
   let d = "";
@@ -119,17 +145,5 @@ export function buildSvg(s: TextSettings, font: Font): string {
     }
   });
 
-  const bg = s.bgTransparent
-    ? ""
-    : `<rect width="${s.width}" height="${s.height}" fill="${s.bgColor}"/>`;
-
-  const strokeAttrs = s.strokeEnabled
-    ? ` stroke="${s.strokeColor}" stroke-width="${s.strokeWidth}" paint-order="stroke"`
-    : "";
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${s.width}" height="${s.height}" viewBox="0 0 ${s.width} ${s.height}">
-  ${bg}
-  <path d="${d.trim()}" fill="${s.color}" fill-rule="nonzero"${strokeAttrs}/>
-  <!-- ${escapeXml(`${text} · weight ${CANVAS_FONT_WEIGHT}`)} -->
-</svg>`;
+  return d;
 }

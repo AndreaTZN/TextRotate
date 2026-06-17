@@ -1,4 +1,8 @@
-import { CANVAS_FONT_WEIGHT, type TextSettings } from "./settings";
+import {
+  CANVAS_FONT_WEIGHT,
+  type TextLayer,
+  type TextSettings,
+} from "./settings";
 
 /**
  * Déformation « Arc » d'Illustrator (Effet > Déformation > Arc, mode Horizontal).
@@ -59,7 +63,7 @@ export function makeEnvelope(
   };
 }
 
-// Interlettrage de base de PP Radio Grotesk : -1% de la taille de police (-0.01em),
+// Interlettrage de base de Centra No.1 : -1% de la taille de police (-0.01em),
 // comme dans le design. S'ajoute à un réglage manuel éventuel (s.letterSpacing).
 const BASE_TRACKING_EM = -0.01;
 
@@ -77,8 +81,12 @@ function applyTextStyle(ctx: CanvasRenderingContext2D, s: TextSettings) {
 }
 
 /** Mesure la largeur totale du texte avec interlettrage (px canvas). */
-function measureWidth(ctx: CanvasRenderingContext2D, s: TextSettings): number {
-  const chars = [...s.text];
+function measureWidth(
+  ctx: CanvasRenderingContext2D,
+  s: TextSettings,
+  text: string,
+): number {
+  const chars = [...text];
   if (chars.length === 0) return 0;
   const gap = tracking(s);
   let w = 0;
@@ -87,13 +95,16 @@ function measureWidth(ctx: CanvasRenderingContext2D, s: TextSettings): number {
 }
 
 /**
- * @param reveal Progression d'apparition par lettre (0 = invisible, 1 = en place).
- *   Peut dépasser 1 (rebond de l'ease). Si omis, tout est affiché à 100 %.
+ * Efface le canvas, peint le fond, puis dessine tous les calques de texte.
+ * @param reveal Progression d'apparition par lettre du calque actif (0 = invisible,
+ *   1 = en place). Si omis, tout est affiché à 100 %.
+ * @param revealLayerId Id du calque concerné par `reveal` (les autres à 100 %).
  */
 export function drawCurvedText(
   ctx: CanvasRenderingContext2D,
   s: TextSettings,
   reveal?: number[],
+  revealLayerId?: string,
 ) {
   ctx.clearRect(0, 0, s.width, s.height);
 
@@ -102,7 +113,20 @@ export function drawCurvedText(
     ctx.fillRect(0, 0, s.width, s.height);
   }
 
-  const chars = [...s.text];
+  for (const layer of s.texts) {
+    const r = layer.id === revealLayerId ? reveal : undefined;
+    drawLayer(ctx, s, layer, r);
+  }
+}
+
+/** Dessine un seul calque de texte (déformation Arc, par glyphe). */
+function drawLayer(
+  ctx: CanvasRenderingContext2D,
+  s: TextSettings,
+  layer: TextLayer,
+  reveal?: number[],
+) {
+  const chars = [...layer.text];
   if (chars.length === 0) return;
 
   applyTextStyle(ctx, s);
@@ -128,8 +152,8 @@ export function drawCurvedText(
   const W = Math.max(1, x - gap);
   const H = s.fontSize; // hauteur de référence de la boîte (em)
 
-  const cx = s.width / 2 + s.offsetX;
-  const cy = s.height / 2 + s.offsetY;
+  const cx = s.width / 2 + layer.offsetX;
+  const cy = s.height / 2 + layer.offsetY;
   const env = makeEnvelope(s, W, H, cx, cy);
   const base = ctx.getTransform();
 
@@ -181,11 +205,12 @@ export function drawCurvedText(
 export function measureTextBox(
   ctx: CanvasRenderingContext2D,
   s: TextSettings,
+  layer: TextLayer,
 ): { x: number; y: number; w: number; h: number } {
   applyTextStyle(ctx, s);
-  const total = measureWidth(ctx, s);
-  const cx = s.width / 2 + s.offsetX;
-  const cy = s.height / 2 + s.offsetY;
+  const total = measureWidth(ctx, s, layer.text);
+  const cx = s.width / 2 + layer.offsetX;
+  const cy = s.height / 2 + layer.offsetY;
 
   let w = total;
   let h = s.fontSize * 1.4;
