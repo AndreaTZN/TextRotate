@@ -162,7 +162,7 @@ export default function CurvedTextEditor() {
   // Joue l'apparition au montage (police prête) puis, après chaque modification du
   // texte, à la fin de la frappe (debounce ~400 ms) pour ne pas rejouer à chaque
   // caractère.
-  useEffect(() => {
+/*   useEffect(() => {
     if (fontTick === 0) return; // attend le 1er chargement de police
     clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(playReveal, 400);
@@ -170,7 +170,7 @@ export default function CurvedTextEditor() {
       clearTimeout(typingTimer.current);
       revealCtx.current?.revert();
     };
-  }, [fontTick, playReveal]); 
+  }, [fontTick, playReveal]);  */
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
