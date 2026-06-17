@@ -38,7 +38,31 @@ APIs, conventions et structure de fichiers peuvent différer de ce que tu connai
   - `settings.ts` — type `TextSettings`, `DEFAULT_SETTINGS`, pastilles de couleur,
     police canvas, et `loadCanvasFont()` qui force le chargement de la font avant
     de dessiner.
-  - `render.ts` — moteur de rendu canvas + export SVG.
+  - `render.ts` — moteur de déformation : `makeEnvelope()` (géométrie de l'Arc,
+    partagée) + `drawCurvedText()` (rendu canvas).
+  - `svg.ts` — export SVG vectorisé via opentype.js (`buildSvg`), réutilise
+    `makeEnvelope`.
+  - `opentype.d.ts` — types ambient minimaux pour opentype.js (non fournis).
+
+## Animations
+
+Pour **toute animation**, utilise **GSAP** via les skills dédiées (ne pas
+réinventer avec des `keyframes` CSS ou des `setInterval` ad hoc) :
+
+- `gsap-core` — base : `gsap.to/from/fromTo`, easing, durée, stagger,
+  `matchMedia()` (responsive + `prefers-reduced-motion`).
+- `gsap-react` — **à utiliser ici** (React/Next) : hook `useGSAP`, refs,
+  `gsap.context()`, nettoyage au démontage.
+- `gsap-timeline` — séquencer / chorégraphier plusieurs animations.
+- `gsap-scrolltrigger` — animations liées au scroll, pinning, parallaxe.
+- `gsap-plugins` — Draggable, Flip, SplitText, SVG, CustomEase, etc.
+- `gsap-performance` — viser 60 fps (transforms, éviter le layout thrashing).
+- `gsap-utils` — helpers (`clamp`, `mapRange`, `random`, `snap`, `interpolate`…).
+
+Invoque la skill correspondante **avant** d'écrire le code d'animation.
+Le rendu du texte courbé reste sur `<canvas>` (cf. `render.ts`) ; GSAP sert à
+animer l'interface et les transitions, ou à piloter dans le temps les valeurs
+passées au rendu canvas.
 
 ## Polices
 
@@ -54,19 +78,35 @@ APIs, conventions et structure de fichiers peuvent différer de ce que tu connai
 - N'utilise PAS `next/font` pour PP Radio Grotesk : il obscurcit le nom de famille,
   que le canvas ne peut alors pas cibler.
 
-## Rendu de la déformation (render.ts)
+## Rendu de la déformation (render.ts + svg.ts)
 
-- **`curveAmount`** = l'**Inflexion (Bend)** d'Illustrator, en % de -100 à +100
-  (positif = arc convexe vers le haut). Mappé en ratio par `bend()`.
-- C'est un **warp d'enveloppe**, pas un « texte sur cercle » : les lettres ne
-  pivotent pas individuellement, c'est tout le bloc qui se courbe. Technique :
-  on rend le texte « à plat » hors écran, puis on le découpe en fines tranches
-  verticales replacées le long de l'arc (slice-warp).
-- Le bitmap à plat est **suréchantillonné** (`SUPERSAMPLE = 3`) pour rester net
-  une fois déformé.
-- **Export SVG** (`buildSvg`) : approxime la déformation par un `<textPath>` sur
-  un arc de cercle équivalent — le texte reste vectoriel et éditable, au prix
-  d'une légère différence sur les bords.
+Reproduit l'effet **« Effet > Déformation > Arc » (mode Horizontal)** d'Illustrator.
+
+- ⚠️ **Le bon modèle = warp d'enveloppe VERTICAL, PAS un « texte sur chemin ».**
+  Piège déjà tombé plusieurs fois : placer chaque glyphe rigide et le **tourner**
+  le long de la tangente d'un cercle → FAUX. Mesuré sur le SVG de référence
+  Illustrator, la barre du « I » n'est inclinée que ~5° : Illustrator **ne pivote
+  quasiment pas** les lettres. Elles restent **debout** (fûts verticaux verticaux) ;
+  c'est leur **position verticale** qui suit l'arc (haut et bas = arcs parallèles),
+  avec un léger cisaillement vertical pour suivre la pente.
+- Paramètres (`TextSettings`, calés sur la boîte Illustrator de référence) :
+  - **`curveAmount`** = Inflexion (Bend), % de -100 à +100. Mapping `theta = curveAmount/100 * PI`.
+  - **`distortH`** / **`distortV`** = perspectives horizontale / verticale. La
+    distorsion V **doit être symétrique gauche/droite** (`1 + dv*(1-2|uh|)`), sinon
+    un côté plonge plus que l'autre.
+- **`makeEnvelope(s, W, H, cx, cy)`** renvoie une `EnvelopeFn (u,v) -> [x,y]`,
+  **partagée** par le canvas (`drawCurvedText`) et l'export SVG (`svg.ts`) → rendu
+  identique garanti. Pas de bitmap offscreen ni de slice-warp : le canvas dessine
+  chaque glyphe directement (translate + cisaillement/échelle vertical, sans rotation).
+- **Export SVG vectorisé** (`svg.ts`, via **opentype.js**) : on lit les contours des
+  glyphes et on applique la même enveloppe. Ne PAS aplatir les Bézier en polylignes
+  (lettres facettées + trous bouchés) : transformer directement les **points de
+  contrôle** et réémettre les commandes `M/L/Q/C/Z` (`fill-rule="nonzero"` garde les
+  trous). Texte non éditable mais identique au canvas et indépendant de la police
+  chez le destinataire.
+- **opentype.js v2** : `load(url)` est **déprécié** → `fetch(url).arrayBuffer()` puis
+  `opentype.parse(buffer)`. Pas de types fournis → `opentype.d.ts` (déclaration
+  ambient minimale). Chargé en lazy + caché au premier export.
 
 ## Conventions
 

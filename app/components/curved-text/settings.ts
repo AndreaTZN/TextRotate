@@ -5,7 +5,12 @@ export interface TextSettings {
   color: string;
   bold: boolean;
   italic: boolean;
+  /** Inflexion (Bend) de l'Arc Illustrator, en % de -100 à +100. */
   curveAmount: number;
+  /** Distorsion horizontale (perspective) en % de -100 à +100. */
+  distortH: number;
+  /** Distorsion verticale (perspective) en % de -100 à +100. */
+  distortV: number;
   letterSpacing: number;
   /** Décalage du texte par rapport au centre du canvas, en px canvas. */
   offsetX: number;
@@ -37,7 +42,11 @@ export const DEFAULT_SETTINGS: TextSettings = {
   color: "#161407",
   bold: true,
   italic: false,
-  curveAmount: 40,
+  // Réglages d'après la boîte « Options de déformation » d'Illustrator :
+  // Arc horizontal, Inflexion 30 %, Distorsion H 0 %, Distorsion V 5 %.
+  curveAmount: 30,
+  distortH: 0,
+  distortV: 5,
   letterSpacing: 0,
   offsetX: 0,
   offsetY: 0,
@@ -52,11 +61,6 @@ export const DEFAULT_SETTINGS: TextSettings = {
   width: 1100,
   height: 760,
 };
-
-/**
- * Pastilles de couleur du panneau « Color text » (design Figma).
- */
-export const TEXT_SWATCHES = ["#161407", "#ffdb0f", "#aea485", "#c3d9cc"] as const;
 
 /**
  * Force le chargement de la police canvas (PP Radio Grotesk Black) puis appelle
