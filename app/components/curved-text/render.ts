@@ -67,6 +67,42 @@ export function makeEnvelope(
 // comme dans le design. S'ajoute à un réglage manuel éventuel (s.letterSpacing).
 const BASE_TRACKING_EM = -0.01;
 
+// Auto-fit : marge horizontale conservée de chaque côté de la zone (fraction de
+// la largeur du canvas), pour que le texte ne touche jamais le bord.
+const FIT_MARGIN = 0.06;
+
+/**
+ * Largeur du texte déformé (arc compris) pour une taille de police donnée.
+ * @param flatW largeur du texte « à plat » à cette même taille de police.
+ * Sert à l'auto-fit : avec l'arc, la boîte s'élargit d'environ une demi-flèche
+ * de chaque côté + ~une largeur de glyphe (cf. `measureTextBox`).
+ */
+function deformedWidth(s: TextSettings, flatW: number, fontSize: number): number {
+  if (flatW <= 0) return 0;
+  const b = clampUnit(s.curveAmount);
+  if (Math.abs(b) < 0.001) return flatW + fontSize;
+  const theta = b * Math.PI;
+  const R = flatW / Math.abs(theta);
+  const half = Math.min(Math.abs(theta) / 2, Math.PI);
+  return 2 * R * Math.sin(half) + fontSize;
+}
+
+/**
+ * Taille de police effective d'un calque : `s.fontSize` au maximum, réduite pour
+ * que le texte déformé tienne dans la largeur de la zone (auto-fit en largeur).
+ * @param flatW0 largeur du texte « à plat » mesurée à `s.fontSize`.
+ *
+ * La largeur déformée varie linéairement avec la taille de police (avances,
+ * interlettrage et flèche de l'arc s'échelonnent tous proportionnellement à la
+ * police), d'où un facteur d'échelle exact sans itération.
+ */
+export function fitFontSize(s: TextSettings, flatW0: number): number {
+  const maxW = s.width * (1 - 2 * FIT_MARGIN);
+  const d0 = deformedWidth(s, flatW0, s.fontSize);
+  if (d0 <= maxW || d0 <= 0) return s.fontSize;
+  return (s.fontSize * maxW) / d0;
+}
+
 /** Espacement effectif entre caractères en px canvas (em + réglage manuel). */
 function tracking(s: TextSettings): number {
   return s.letterSpacing + BASE_TRACKING_EM * s.fontSize;
@@ -128,6 +164,15 @@ function drawLayer(
 ) {
   const chars = [...layer.text];
   if (chars.length === 0) return;
+
+  // Auto-fit en largeur : on mesure le texte à la taille de base, puis on réduit
+  // la police si le texte déformé déborderait de la zone. On travaille ensuite
+  // avec une copie des réglages portant cette taille effective (tracking, boîte,
+  // enveloppe… tout en dépend).
+  applyTextStyle(ctx, s);
+  const flatW0 = measureWidth(ctx, s, layer.text);
+  const fittedSize = fitFontSize(s, flatW0);
+  if (fittedSize !== s.fontSize) s = { ...s, fontSize: fittedSize };
 
   applyTextStyle(ctx, s);
   ctx.fillStyle = s.color;
@@ -208,6 +253,13 @@ export function measureTextBox(
   layer: TextLayer,
 ): { x: number; y: number; w: number; h: number } {
   applyTextStyle(ctx, s);
+  // Même auto-fit que le rendu, pour que la boîte de hit-test suive le texte.
+  const flatW0 = measureWidth(ctx, s, layer.text);
+  const fittedSize = fitFontSize(s, flatW0);
+  if (fittedSize !== s.fontSize) {
+    s = { ...s, fontSize: fittedSize };
+    applyTextStyle(ctx, s);
+  }
   const total = measureWidth(ctx, s, layer.text);
   const cx = s.width / 2 + layer.offsetX;
   const cy = s.height / 2 + layer.offsetY;

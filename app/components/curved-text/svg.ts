@@ -1,5 +1,5 @@
 import type { Font, PathCommand } from "opentype.js";
-import { makeEnvelope } from "./render";
+import { fitFontSize, makeEnvelope } from "./render";
 import {
   CANVAS_FONT_WEIGHT,
   type TextLayer,
@@ -67,6 +67,18 @@ export function buildSvg(s: TextSettings, font: Font): string {
 /** Construit le sous-chemin `d` vectorisé d'un calque (warp d'enveloppe). */
 function buildLayerPath(s: TextSettings, layer: TextLayer, font: Font): string {
   const text = layer.text;
+
+  // Auto-fit en largeur (identique au canvas) : largeur « à plat » à la taille de
+  // base, puis taille de police effective si le texte déformé déborde de la zone.
+  const baseUnit = s.fontSize / font.unitsPerEm;
+  let flatW0 = 0;
+  for (const ch of [...text]) {
+    flatW0 += font.charToGlyph(ch).advanceWidth * baseUnit + tracking(s);
+  }
+  flatW0 = Math.max(0, flatW0 - tracking(s));
+  const fittedSize = fitFontSize(s, flatW0);
+  if (fittedSize !== s.fontSize) s = { ...s, fontSize: fittedSize };
+
   const fontSize = s.fontSize;
   const gap = tracking(s);
   const unit = fontSize / font.unitsPerEm;
