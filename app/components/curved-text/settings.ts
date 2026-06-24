@@ -44,7 +44,7 @@ export interface TextSettings {
  * Seule la Black est utilisée pour le grand texte, comme dans le design.
  */
 export const CANVAS_FONT_FAMILY = "'Centra No1', sans-serif";
-export const CANVAS_FONT_WEIGHT = 900;
+export const CANVAS_FONT_WEIGHT = 600;
 
 /** Génère un identifiant de calque unique. */
 export function makeLayerId(): string {

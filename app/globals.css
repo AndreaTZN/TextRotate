@@ -17,6 +17,13 @@
 }
 @font-face {
   font-family: "Centra No1";
+  src: url("/Font/CentraNo.1-ExtraBold-Trial.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Centra No1";
   src: url("/Font/CentraNo.1-Bold-Trial.otf") format("opentype");
   font-weight: 700;
   font-style: normal;
