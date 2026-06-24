@@ -14,7 +14,7 @@ import { buildSvg } from "./svg";
 import type { Font } from "opentype.js";
 
 // Police vectorisée (pour l'export SVG), chargée à la demande via opentype.js.
-const CANVAS_FONT_URL = "/Font/CentraNo.1-Black-Trial.otf";
+const CANVAS_FONT_URL = "/Font/CentraNo.1-ExtraBold-Trial.otf";
 
 // Le canvas affiché utilise un backing store 2x pour rester net sur écran retina.
 const RENDER_SCALE = 2;
