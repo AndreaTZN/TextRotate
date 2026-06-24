@@ -74,7 +74,7 @@ export default function HomeLoader() {
       className="fixed inset-0 z-100 flex items-end justify-end bg-(--cream) p-6 text-(--ink) sm:p-10"
     >
       {/* Compteur 0 -> 100 %, police Black, ancré en bas à droite. */}
-      <div className="loader-count flex items-end font-semibold leading-[0.8] tracking-[-0.02em]">
+      <div className="loader-count flex items-end font-extrabold leading-[0.8] tracking-[-0.02em]">
         <span ref={numberRef} className="text-[17vw] tabular-nums">
           0
         </span>
