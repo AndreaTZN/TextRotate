@@ -30,8 +30,8 @@ export default function DesktopOnlyNotice() {
       </svg>
 
       <div className="flex max-w-sm flex-col gap-3">
-        <h1 className="text-2xl font-bold leading-tight tracking-[-0.01em]">
-          Disponible sur ordinateur uniquement
+        <h1 className="text-2xl font-semibold leading-tight tracking-[-0.01em]">
+          Disponible sur desktop uniquement
         </h1>
         <p className="text-base leading-snug tracking-[-0.01em] text-(--ink)/70">
           Cet outil a besoin d&apos;un grand écran pour l&apos;éditeur et le
